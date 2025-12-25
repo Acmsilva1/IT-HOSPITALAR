@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import gspread
-from gspread.utils import convert_json_string_to_service_account_info
+# A importação antiga e com erro (gspread.utils) foi removida.
 
 # Lista de todas as abas (Worksheets) a serem lidas
 SHEET_NAMES = [
@@ -27,9 +27,9 @@ def load_all_rotinas_from_drive():
     all_data = []
     
     try:
-        # 1. Autenticação Segura via Streamlit Secrets
-        info = convert_json_string_to_service_account_info(st.secrets["gcp_service_account"])
-        gc = gspread.service_account_info(info=info)
+        # 1. Autenticação Segura via Streamlit Secrets (CORRIGIDO!)
+        # O StreamlitSecrets injeta o dicionário JSON diretamente.
+        gc = gspread.service_account(info=st.secrets["gcp_service_account"])
         
         # 2. Abre a planilha pelo ID
         sh = gc.open_by_key(SPREADSHEET_ID)
@@ -49,14 +49,9 @@ def load_all_rotinas_from_drive():
         return df_final
 
     except KeyError as e:
-        # Este erro é crítico para a governança: Credenciais faltando ou incorretas
-        st.error(f"ERRO DE CONFIGURAÇÃO: Chave secreta '{e}' não encontrada. Verifique .streamlit/secrets.toml.")
+        st.error(f"ERRO DE CONFIGURAÇÃO: Chave secreta '{e}' não encontrada. Verifique .streamlit/secrets.toml ou a configuração de Secrets no Streamlit Sharing.")
         return pd.DataFrame()
     except Exception as e:
+        # Se falhar aqui, o problema é na permissão da planilha ou no JSON formatado errado.
         st.error(f"Erro ao conectar ou ler a planilha: {e}. Verifique o acesso da Service Account.")
         return pd.DataFrame()
-
-# O arquivo secrets.toml deve incluir:
-# [spreadsheet_ids]
-# rotinas_hospitalares = "1pHQr_ZII7Kv4WT-lYwJ1h4xiWUxB4RxSpgy7KFIEK5k"
-# E a seção [gcp_service_account] com seu JSON.
