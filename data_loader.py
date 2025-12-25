@@ -13,15 +13,15 @@ SHEET_NAMES = [
     'RECEPCAO_PS',
     'RECEPCAO_CENTRAL',
     'PORTARIA',
-    'MEDICOS' 
+    'MEDICOS',
+    'ENFERMAGEM',   # <<-- NOVA ABA
+    'MANUTENCAO'    # <<-- NOVA ABA
 ]
 
 # ID da planilha lido dos secrets para segurança
 try:
     SPREADSHEET_ID = st.secrets["spreadsheet_ids"]["rotinas_hospitalares"] 
 except KeyError:
-    # Caso essa chave não exista, a exceção será tratada na função principal, mas 
-    # é bom ter o try/except para evitar falhas imediatas de script loading.
     SPREADSHEET_ID = None
 
 # --- Função Principal de Carga de Dados ---
@@ -35,8 +35,7 @@ def load_all_rotinas_from_drive():
     all_data = []
     
     try:
-        # 1. Autenticação Segura via Streamlit Secrets (CORREÇÃO FINAL)
-        # Usa service_account_from_dict, a função correta para dicionários de credenciais.
+        # 1. Autenticação Segura (função corrigida)
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
         
         # 2. Abre a planilha pelo ID
@@ -60,14 +59,13 @@ def load_all_rotinas_from_drive():
         return df_final
 
     except KeyError as e:
-        # Erro comum: Chave faltando ou incorreta no secrets.toml
         st.error(f"ERRO DE CONFIGURAÇÃO (KeyError): Verifique se a chave '{e}' está correta nos Secrets.")
         return pd.DataFrame()
     except gspread.exceptions.APIError as e:
-        # Erro comum: A Service Account não tem permissão de Leitor na planilha.
-        st.error(f"ERRO DE PERMISSÃO (403 Forbidden): Certifique-se de que a Service Account ({st.secrets['gcp_service_account']['client_email']}) foi adicionada como Leitor na Planilha Google.")
+        # O e-mail da Service Account é: analise-de-vendas-820@bolos-b9ca2.iam.gserviceaccount.com
+        # Lembrete de governança: Certifique-se que este e-mail tem acesso de Leitor.
+        st.error(f"ERRO DE PERMISSÃO (403 Forbidden): Certifique-se de que a Service Account foi adicionada como Leitor na Planilha Google.")
         return pd.DataFrame()
     except Exception as e:
-        # Erros genéricos de conexão
         st.error(f"Erro Inesperado ao carregar dados: {e}")
         return pd.DataFrame()
