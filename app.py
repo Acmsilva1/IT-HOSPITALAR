@@ -15,7 +15,7 @@ df_rotinas = load_all_rotinas_from_drive()
 st.title("🏥 Sistema de Gerenciamento de Conhecimento Hospitalar (SGC)")
 
 if df_rotinas.empty:
-    # Se der erro (credenciais/permissão), o data_loader já mostra a mensagem.
+    # Caso o data_loader falhe (erro de secrets, permissão, etc.)
     st.info("Aguardando dados da Planilha. Se o erro acima persistir, verifique as credenciais e as permissões.")
     st.markdown("---")
 else:
@@ -34,11 +34,11 @@ else:
         menu_options
     )
     
-    # --- Corpo da Aplicação (Onde a Mágica Acontece) ---
+    # --- Corpo da Aplicação (Conteúdo Principal) ---
     st.markdown("---")
 
     if selected_setor == "— Selecione um Setor —":
-        # 1. Tela Inicial Limpa (sem dados brutos)
+        # 1. Tela Inicial Limpa
         st.header("Seja bem-vindo(a) ao Guia de Rotinas Tasy/SGC")
         st.info(
             f"Use o menu lateral (**Navegação por Setor**) para acessar as rotinas específicas "
@@ -83,7 +83,8 @@ else:
                 col1, col2 = st.columns([1, 2])
                 with col1:
                     st.metric("ID da Rotina", row['ID_DA_ROTINA'])
-                    st.caption(f"Fluxo: {row['FLUXO_PRINCIPAL']}")
+                    # CORREÇÃO VISUAL: FLUXO agora em negrito e com ícone para clareza
+                    st.markdown(f"**🔗 Fluxo Tasy:** **{row['FLUXO_PRINCIPAL']}**") 
                 with col2:
                     st.warning(f"⚠️ Observações: {row['OBSERVACOES']}" if row['OBSERVACOES'] else "Sem observações críticas.")
 
