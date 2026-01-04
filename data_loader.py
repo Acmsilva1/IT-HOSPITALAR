@@ -1,10 +1,12 @@
+# data_loader.py - VERIFIQUE AS PRIMEIRAS LINHAS
+
 import streamlit as st
 import pandas as pd
-import gspread
+import gspread # GARANTIDO: Gspread está importado
 
 # --- Configurações de Governança ---
+# ... (código SPREADSHEET_ID e SHEET_NAMES inalterado) ...
 
-# Lista de todas as abas (Worksheets) a serem lidas para unificação
 SHEET_NAMES = [
     'REGULACAO',
     'INTERNACAO',
@@ -18,7 +20,6 @@ SHEET_NAMES = [
     'MANUTENCAO'
 ]
 
-# ID da planilha lido dos secrets para segurança
 try:
     SPREADSHEET_ID = st.secrets["spreadsheet_ids"]["rotinas_hospitalares"] 
 except KeyError:
@@ -35,26 +36,22 @@ def load_all_rotinas_from_drive():
     all_data = []
     
     try:
-        # 1. Autenticação Segura
+        # Usa o gspread importado globalmente
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
         
-        # 2. Abre a planilha pelo ID
         if not SPREADSHEET_ID:
             raise KeyError("ID da planilha não encontrado nos secrets.")
             
         sh = gc.open_by_key(SPREADSHEET_ID)
         
-        # 3. Itera sobre todas as abas e unifica os dados
         for name in SHEET_NAMES:
             worksheet = sh.worksheet(name)
             data = worksheet.get_all_records()
             df = pd.DataFrame(data)
             
-            # Adiciona a coluna 'SETOR' para fácil filtragem
             df['SETOR'] = name
             all_data.append(df)
 
-        # 4. Concatena tudo em um DataFrame único
         df_final = pd.concat(all_data, ignore_index=True)
         return df_final
 
@@ -98,7 +95,7 @@ def update_rotina(sheet_name: str, old_title: str, new_data: dict):
     Busca uma rotina pelo TITULO_PROCEDIMENTO na aba específica e atualiza sua linha.
     """
     try:
-        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
+        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"]) # Usa gspread
         sh = gc.open_by_key(SPREADSHEET_ID)
         worksheet = sh.worksheet(sheet_name)
         
@@ -126,7 +123,7 @@ def update_rotina(sheet_name: str, old_title: str, new_data: dict):
             new_val = new_data.get(header.strip(), all_values[row_index_to_update - 1][headers.index(header)])
             new_values_list.append(str(new_val))
 
-        # Atualizar a linha inteira no Sheets
+        # Atualizar a linha inteira no Sheets - Usa gspread.utils
         import gspread.utils
         range_to_update = f'A{row_index_to_update}:{gspread.utils.rowcol_to_a1(row_index_to_update, len(headers))}'
         
@@ -139,18 +136,17 @@ def update_rotina(sheet_name: str, old_title: str, new_data: dict):
         return False
 
 
-# --- NOVA FUNÇÃO: Excluir Rotina (Delete) ---
+# --- Função: Excluir Rotina (Delete) ---
 
 def delete_rotina(sheet_name: str, title_to_delete: str):
     """
     Busca uma rotina pelo TITULO_PROCEDIMENTO na aba específica e a deleta.
     """
     try:
-        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
+        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"]) # Usa gspread
         sh = gc.open_by_key(SPREADSHEET_ID)
         worksheet = sh.worksheet(sheet_name)
         
-        # 1. Obter todos os valores para encontrar a linha
         all_values = worksheet.get_all_values()
         headers = all_values[0]
         
@@ -160,12 +156,9 @@ def delete_rotina(sheet_name: str, title_to_delete: str):
             st.error("Coluna 'TITULO_PROCEDIMENTO' não encontrada. Verifique os cabeçalhos do Sheets.")
             return False
 
-        # 2. Encontrar o índice da linha que corresponde ao título
         row_index_to_delete = -1
-        # Começamos a buscar da linha 2 (índice 1 no array, pois all_values[0] são os headers)
         for i, row in enumerate(all_values[1:]): 
             if row[title_col_index] == title_to_delete:
-                # O índice da linha no Sheets é i + 2
                 row_index_to_delete = i + 2 
                 break
         
@@ -173,7 +166,7 @@ def delete_rotina(sheet_name: str, title_to_delete: str):
             st.warning(f"Rotina com título '{title_to_delete}' não encontrada para exclusão na aba '{sheet_name}'.")
             return False
             
-        # 3. Excluir a linha inteira no Sheets
+        # Excluir a linha inteira no Sheets
         worksheet.delete_rows(row_index_to_delete)
         
         return True
