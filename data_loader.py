@@ -91,7 +91,7 @@ def append_new_rotina(data: dict, sheet_name: str):
         st.error(f"Erro ao escrever na aba {sheet_name}. Detalhes: {e}")
         return False
 
-# --- NOVA FUNÇÃO: Atualizar Rotina Existente (Update) ---
+# --- Função: Atualizar Rotina Existente (Update) ---
 
 def update_rotina(sheet_name: str, old_title: str, new_data: dict):
     """
@@ -102,23 +102,18 @@ def update_rotina(sheet_name: str, old_title: str, new_data: dict):
         sh = gc.open_by_key(SPREADSHEET_ID)
         worksheet = sh.worksheet(sheet_name)
         
-        # 1. Obter todos os valores da planilha para encontrar a linha
         all_values = worksheet.get_all_values()
         headers = all_values[0]
         
-        # Localiza o índice da coluna do TITULO_PROCEDIMENTO (para buscar)
         try:
             title_col_index = headers.index("TITULO_PROCEDIMENTO")
         except ValueError:
             st.error("Coluna 'TITULO_PROCEDIMENTO' não encontrada. Verifique os cabeçalhos do Sheets.")
             return False
 
-        # 2. Encontrar o índice da linha que corresponde ao título
         row_index_to_update = -1
-        # Começamos a buscar da linha 2 (índice 1 no array, pois all_values[0] são os headers)
         for i, row in enumerate(all_values[1:]): 
             if row[title_col_index] == old_title:
-                # O índice da linha no Sheets é i + 2 (1 para headers, 1 para conversão de índice 0)
                 row_index_to_update = i + 2 
                 break
         
@@ -126,16 +121,13 @@ def update_rotina(sheet_name: str, old_title: str, new_data: dict):
             st.warning(f"Rotina com título '{old_title}' não encontrada para edição na aba '{sheet_name}'.")
             return False
             
-        # 3. Preparar os novos valores na ordem correta dos cabeçalhos
         new_values_list = []
         for header in headers:
-            # Pega o novo valor do dicionário 'new_data'.
-            # Se o header não estiver no dicionário, tentamos pegar o valor antigo para evitar apagar.
             new_val = new_data.get(header.strip(), all_values[row_index_to_update - 1][headers.index(header)])
             new_values_list.append(str(new_val))
 
-        # 4. Atualizar a linha inteira no Sheets
-        # Cria a string de faixa (ex: 'A5:F5')
+        # Atualizar a linha inteira no Sheets
+        import gspread.utils
         range_to_update = f'A{row_index_to_update}:{gspread.utils.rowcol_to_a1(row_index_to_update, len(headers))}'
         
         worksheet.update(range_to_update, [new_values_list], value_input_option='USER_ENTERED')
@@ -144,4 +136,48 @@ def update_rotina(sheet_name: str, old_title: str, new_data: dict):
 
     except Exception as e:
         st.error(f"Erro ao atualizar a rotina '{old_title}' na aba '{sheet_name}'. Detalhes: {e}")
+        return False
+
+
+# --- NOVA FUNÇÃO: Excluir Rotina (Delete) ---
+
+def delete_rotina(sheet_name: str, title_to_delete: str):
+    """
+    Busca uma rotina pelo TITULO_PROCEDIMENTO na aba específica e a deleta.
+    """
+    try:
+        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
+        sh = gc.open_by_key(SPREADSHEET_ID)
+        worksheet = sh.worksheet(sheet_name)
+        
+        # 1. Obter todos os valores para encontrar a linha
+        all_values = worksheet.get_all_values()
+        headers = all_values[0]
+        
+        try:
+            title_col_index = headers.index("TITULO_PROCEDIMENTO")
+        except ValueError:
+            st.error("Coluna 'TITULO_PROCEDIMENTO' não encontrada. Verifique os cabeçalhos do Sheets.")
+            return False
+
+        # 2. Encontrar o índice da linha que corresponde ao título
+        row_index_to_delete = -1
+        # Começamos a buscar da linha 2 (índice 1 no array, pois all_values[0] são os headers)
+        for i, row in enumerate(all_values[1:]): 
+            if row[title_col_index] == title_to_delete:
+                # O índice da linha no Sheets é i + 2
+                row_index_to_delete = i + 2 
+                break
+        
+        if row_index_to_delete == -1:
+            st.warning(f"Rotina com título '{title_to_delete}' não encontrada para exclusão na aba '{sheet_name}'.")
+            return False
+            
+        # 3. Excluir a linha inteira no Sheets
+        worksheet.delete_rows(row_index_to_delete)
+        
+        return True
+
+    except Exception as e:
+        st.error(f"Erro ao deletar a rotina '{title_to_delete}' na aba '{sheet_name}'. Detalhes: {e}")
         return False
