@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 
-# --- Configurações de Governança ---
+# --- Configurações de Governança (Sem Alteração) ---
 
 # Lista de todas as abas (Worksheets) a serem lidas para unificação
 SHEET_NAMES = [
@@ -26,7 +26,7 @@ except KeyError:
 
 # --- Função Principal de Carga de Dados ---
 
-@st.cache_data(ttl=600) # Armazena em cache por 10 minutos
+@st.cache_data # ALTERADO: Removido o (ttl=600). Agora o cache só é limpo com .clear() ou F5.
 def load_all_rotinas_from_drive():
     """
     Carrega dados de todas as abas da Planilha Google de forma segura 
@@ -34,6 +34,7 @@ def load_all_rotinas_from_drive():
     """
     all_data = []
     
+    # ... (Resto do código sem alteração) ...
     try:
         # 1. Autenticação Segura (função corrigida)
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
@@ -62,7 +63,6 @@ def load_all_rotinas_from_drive():
         st.error(f"ERRO DE CONFIGURAÇÃO (KeyError): Verifique se a chave '{e}' está correta nos Secrets.")
         return pd.DataFrame()
     except gspread.exceptions.APIError as e:
-        # O e-mail da Service Account é: analise-de-vendas-820@bolos-b9ca2.iam.gserviceaccount.com
         # Lembrete de governança: Certifique-se que este e-mail tem acesso de Leitor.
         st.error(f"ERRO DE PERMISSÃO (403 Forbidden): Certifique-se de que a Service Account foi adicionada como Leitor na Planilha Google.")
         return pd.DataFrame()
