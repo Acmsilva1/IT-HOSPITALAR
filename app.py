@@ -9,7 +9,6 @@ from data_loader import load_all_rotinas_from_drive, append_new_rotina, update_r
 def main_view(df_rotinas, setor_options):
     """Lógica da Página de Visualização de Rotinas (Read)"""
     st.header("🔍 Visualização de Rotinas do SGC Hospitalar")
-    # ... (código de navegação e filtros) ...
     
     st.sidebar.header("🧭 Navegação por Setor")
     menu_options = ["— Selecione um Setor —"] + setor_options
@@ -17,17 +16,26 @@ def main_view(df_rotinas, setor_options):
     st.markdown("---")
 
     if selected_setor == "— Selecione um Setor —":
-        # ... (tela de boas vindas) ...
         st.header("Seja bem-vindo(a) ao Guia de Rotinas Tasy/SGC")
         st.info(f"Use o menu lateral para acessar as rotinas específicas de cada uma das **{len(setor_options)}** áreas.")
+        st.markdown("##### Foco em Ação, Não em Burocracia.")
+        st.caption("Última atualização de dados: " + pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"))
     else:
-        # ... (código de filtro e exibição) ...
-        search_query = st.sidebar.text_input(f"🔎 Buscar em Rotinas de {selected_setor}")
+        st.sidebar.markdown("---")
+        search_query = st.sidebar.text_input(f"🔎 Buscar em Rotinas de {selected_setor}", help="Busca no Título do Procedimento e nas Ações/Passos.")
+        
         st.header(f"Setor: {selected_setor} Rotinas Tasy")
         df_filtered = df_rotinas[df_rotinas['SETOR'] == selected_setor].copy()
 
-        # [Código de filtro de busca inalterado]
-
+        if search_query:
+            search_query = search_query.lower()
+            df_filtered = df_filtered[
+                df_filtered['TITULO_PROCEDIMENTO'].astype(str).str.lower().str.contains(search_query) | 
+                df_filtered['ACOES'].astype(str).str.lower().str.contains(search_query)
+            ]
+        
+        st.subheader(f"Total de Rotinas Encontradas: {len(df_filtered)}")
+        
         if not df_filtered.empty:
             for index, row in df_filtered.iterrows():
                 st.markdown(f"### 📋 {row['TITULO_PROCEDIMENTO']}")
@@ -41,12 +49,12 @@ def main_view(df_rotinas, setor_options):
                 with col2:
                     st.warning(f"⚠️ Observações: {row['OBSERVACOES']}" if row['OBSERVACOES'] else "Sem observações críticas.")
 
-                # --- NOVO BLOCO: Exibição da Imagem (st.expander para não poluir) ---
+                # --- Exibição da Imagem (st.expander) ---
                 image_url = row.get('URL_IMAGEM')
                 if image_url and str(image_url).strip():
                     with st.expander("🖼️ Clique para visualizar o Anexo/Fluxograma"):
                         st.image(str(image_url), caption=f"Anexo para: {row['TITULO_PROCEDIMENTO']}", width=400)
-                # --- FIM NOVO BLOCO ---
+                # --- FIM Imagem ---
                 
                 st.markdown("#### 🚀 Passo a Passo Objetivo:")
                 for i, passo in enumerate(acoes_list):
@@ -63,7 +71,8 @@ def main_view(df_rotinas, setor_options):
 def create_rotina_tab(setor_options):
     """Lógica da Sub-Aba para Criação de Novas Rotinas (Create)"""
     st.subheader("Adicionar Nova Rotina")
-    # ... (código do formulário CREATE) ...
+    st.info("Preencha o formulário para adicionar uma nova rotina diretamente no Google Sheets.")
+    
     with st.form(key='rotina_form'):
         
         selected_setor = st.selectbox("1. Setor de Destino:", options=["— Selecione um Setor —"] + setor_options, key='create_setor_input')
@@ -80,10 +89,8 @@ def create_rotina_tab(setor_options):
         st.markdown("---")
         st.markdown("#### 🖼️ Anexo Visual (Imagem)")
 
-        # Campo de URL para a imagem
         anexo_url = st.text_input("7. URL da Imagem/Fluxograma (Link Direto):", key='create_anexo_url', help="Cole o link direto da imagem aqui (salva no Drive/GitHub, etc.).")
 
-        # Uploader para pré-visualização
         uploaded_file = st.file_uploader("Upload de Imagem para PRÉ-VISUALIZAÇÃO:", type=['png', 'jpg', 'jpeg'], key='temp_file_uploader')
         
         if uploaded_file is not None:
@@ -92,30 +99,35 @@ def create_rotina_tab(setor_options):
         
         submit_button = st.form_submit_button(label='💾 Salvar Nova Rotina no Sheets')
 
-    if submit_button:
-        if not titulo or not acoes or selected_setor == "— Selecione um Setor —":
-            st.error("🚨 Preencha o Título, as Ações/Passos e selecione um Setor de destino.")
-            return
+        # LÓGICA DE SUBMISSÃO DENTRO DO FORM
+        if submit_button:
+            if not titulo or not acoes or selected_setor == "— Selecione um Setor —":
+                st.error("🚨 Preencha o Título, as Ações/Passos e selecione um Setor de destino.")
+                return
 
-        data_to_save = {
-            "ID_DA_ROTINA": id_rotina,
-            "TITULO_PROCEDIMENTO": titulo,
-            "FLUXO_PRINCIPAL": fluxo_principal,
-            "ACOES": acoes.replace('\n', '#'), 
-            "OBSERVACOES": observacoes,
-            "URL_IMAGEM": anexo_url # Novo Campo
-        }
-        
-        with st.spinner(f"Salvando rotina no Sheets na aba {selected_setor}..."):
-            if append_new_rotina(data_to_save, selected_setor):
-                load_all_rotinas_from_drive.clear()
-                st.success(f"Rotina '{titulo}' salva com sucesso!")
-            else:
-                st.warning("Falha ao salvar. Verifique logs ou credenciais.")
+            data_to_save = {
+                "ID_DA_ROTINA": id_rotina,
+                "TITULO_PROCEDIMENTO": titulo,
+                "FLUXO_PRINCIPAL": fluxo_principal,
+                "ACOES": acoes.replace('\n', '#'), 
+                "OBSERVACOES": observacoes,
+                "URL_IMAGEM": anexo_url
+            }
+            
+            with st.spinner(f"Salvando rotina no Sheets na aba {selected_setor}..."):
+                if append_new_rotina(data_to_save, selected_setor):
+                    load_all_rotinas_from_drive.clear()
+                    st.success(f"Rotina '{titulo}' salva com sucesso! Pressione 'Atualizar Dados Agora' na Visualização para ver a mudança.")
+                else:
+                    st.warning("Falha ao salvar. Verifique logs ou credenciais.")
+
 
 def edit_rotina_tab(df_rotinas):
     """Lógica da Sub-Aba para Edição/Exclusão de Rotinas Existentes (Update/Delete)"""
-    # ... (código de seleção de rotina inalterado) ...
+    st.subheader("Alterar ou Excluir Rotina Existente")
+    st.info("Selecione uma rotina para carregar, editar ou deletar seus dados.")
+    
+    # 1. SELEÇÃO DA ROTINA
     rotina_tuples = [(f"{row['TITULO_PROCEDIMENTO']} ({row['SETOR']})", row['TITULO_PROCEDIMENTO']) 
                      for index, row in df_rotinas.iterrows()]
     display_options = ["— Selecione uma Rotina —"] + [t[0] for t in rotina_tuples]
@@ -127,41 +139,71 @@ def edit_rotina_tab(df_rotinas):
     current_data = df_rotinas[df_rotinas['TITULO_PROCEDIMENTO'] == selected_title].iloc[0]
     sheet_name = current_data['SETOR']
     initial_acoes = current_data['ACOES'].replace('#', '\n') if isinstance(current_data['ACOES'], str) else ""
-    initial_anexo_url = current_data.get('URL_IMAGEM', '') # Obtém o valor, ou vazio se a coluna não existir
+    initial_anexo_url = current_data.get('URL_IMAGEM', '') 
+
+    st.markdown("---")
+    st.caption(f"Rotina Selecionada: **{current_data['TITULO_PROCEDIMENTO']}** na aba **{sheet_name}**")
     
+    # 3. FORMULÁRIO DE EDIÇÃO (Lógica de Update DENTRO)
     with st.form(key='edit_rotina_form'):
-        # ... (Campos Título, ID, Fluxo, Ações, Observações inalterados) ...
         
-        # Campo de URL para a imagem na edição
+        titulo = st.text_input("1. Título do Procedimento (TITULO_PROCEDIMENTO):", value=current_data['TITULO_PROCEDIMENTO'], key='edit_titulo_input')
+        col1, col2 = st.columns(2)
+        with col1: id_rotina = st.text_input("2. ID da Rotina:", value=current_data['ID_DA_ROTINA'], key='edit_id_input')
+        with col2: fluxo_principal = st.text_input("3. Fluxo Principal:", value=current_data['FLUXO_PRINCIPAL'], key='edit_fluxo_input')
+        acoes = st.text_area("4. Ações/Passo a Passo:", value=initial_acoes, key='edit_acoes_input', height=250)
+        observacoes = st.text_area("5. Observações:", value=current_data['OBSERVACOES'], key='edit_obs_input')
         anexo_url = st.text_input("URL do Anexo (Link direto):", value=initial_anexo_url, key='edit_anexo_url')
         
-        # Uploader para pré-visualização
         uploaded_file = st.file_uploader("Upload de Imagem para PRÉ-VISUALIZAÇÃO:", type=['png', 'jpg', 'jpeg'], key='temp_file_uploader_edit')
-        
         if uploaded_file is not None:
             st.image(uploaded_file, caption=f"Pré-visualização: {uploaded_file.name}", width=250)
-            st.info("Lembre-se: Você precisa salvar o link de acesso no campo de URL!")
             
-        # ... (Botões de Ação - UPDATE e DELETE - inalterados) ...
-
-    # 4. LÓGICA DE SALVAMENTO (UPDATE)
-    if submit_update:
-        # ... (verificações inalteradas) ...
-            
-        data_to_update = {
-            # ... (demais campos)
-            "ACOES": acoes.replace('\n', '#'),
-            "OBSERVACOES": observacoes,
-            "URL_IMAGEM": anexo_url # <-- Salva o link atualizado
-        }
+        st.markdown("---")
         
-        # ... (lógica de chamada update_rotina inalterada) ...
+        # Botão de Ação
+        submit_update = st.form_submit_button(label='✍️ Salvar Alterações (UPDATE)')
+        
+        # LÓGICA DE SALVAMENTO (UPDATE) MOVIDA PARA DENTRO DO FORM
+        if submit_update:
+            if not titulo or not acoes:
+                st.error("🚨 O Título e as Ações/Passos não podem ficar vazios.")
+            else:
+                data_to_update = {
+                    "ID_DA_ROTINA": id_rotina,
+                    "TITULO_PROCEDIMENTO": titulo, 
+                    "FLUXO_PRINCIPAL": fluxo_principal,
+                    "ACOES": acoes.replace('\n', '#'),
+                    "OBSERVACOES": observacoes,
+                    "URL_IMAGEM": anexo_url
+                }
+                
+                with st.spinner(f"Atualizando rotina no Sheets na aba {sheet_name}..."):
+                    if update_rotina(sheet_name, current_data['TITULO_PROCEDIMENTO'], data_to_update):
+                        load_all_rotinas_from_drive.clear() 
+                        st.success(f"Rotina '{titulo}' atualizada com sucesso na aba '{sheet_name}'!")
+                        st.rerun() 
+                    else:
+                        st.warning("Falha ao atualizar. Verifique logs ou credenciais.")
+                        
+    # 5. LÓGICA DE EXCLUSÃO (DELETE) FORA DO FORMULÁRIO DE EDIÇÃO
+    st.markdown("---")
+    st.subheader("Ação Perigosa: Exclusão")
 
-    # 5. LÓGICA DE EXCLUSÃO (DELETE)
-    # ... (código inalterado) ...
+    if st.button('🗑️ Excluir Rotina Permanentemente', type="primary", key="delete_button"):
+        st.warning("CONFIRMAÇÃO: Você tem certeza que deseja EXCLUIR permanentemente esta rotina? Se sim, clique no botão 'CONFIRMAR EXCLUSÃO' abaixo.")
+        
+        if st.button(f"CONFIRMAR EXCLUSÃO: {selected_title}", type="secondary", key="confirm_delete_button"):
+            with st.spinner(f"Excluindo rotina '{selected_title}' na aba {sheet_name}..."):
+                if delete_rotina(sheet_name, selected_title):
+                    load_all_rotinas_from_drive.clear()
+                    st.success(f"Rotina '{selected_title}' DELETADA com sucesso! Recarregando a página...")
+                    st.rerun()
+                else:
+                    st.error("Falha ao deletar. Rotina não excluída.")
 
 def login_screen():
-    # ... (código inalterado) ...
+    """Mostra a tela de login e verifica a senha."""
     try:
         ADMIN_PASSWORD = st.secrets["auth"]["admin_password"]
     except KeyError:
@@ -169,6 +211,8 @@ def login_screen():
         return False
         
     st.header("🔑 Acesso Administrativo")
+    st.info("Esta área exige autenticação para gerenciar.")
+    
     with st.form("login_form"):
         password = st.text_input("Senha de Administrador:", type="password")
         submit_button = st.form_submit_button("Entrar")
@@ -176,7 +220,7 @@ def login_screen():
     if submit_button:
         if password == ADMIN_PASSWORD:
             st.session_state['logged_in'] = True
-            st.success("Acesso concedido!")
+            st.success("Acesso concedido! Bem-vindo(a).")
             st.rerun() 
         else:
             st.error("Senha incorreta. Acesso Negado.")
@@ -184,10 +228,12 @@ def login_screen():
             
     return st.session_state.get('logged_in', False)
 
+
 def admin_view(df_rotinas, setor_options):
-    # ... (código inalterado) ...
-    st.header("🛠️ Gerenciamento de Rotinas")
+    """Função Principal do Módulo de Gerenciamento (Tabs) - Acesso Permitido"""
+    st.header("🛠️ Gerenciamento de Rotinas (Criação e Edição/Exclusão)")
     st.success("🔒 Área protegida: Logado como Administrador.")
+    st.info("Utilize as abas abaixo para gerenciar os processos hospitalares.")
     
     tab1, tab2 = st.tabs(["➕ Criar Nova Rotina", "✏️ Alterar/Excluir Rotina Existente"])
     
@@ -195,6 +241,7 @@ def admin_view(df_rotinas, setor_options):
     with tab2: edit_rotina_tab(df_rotinas) 
 
 def admin_controller(df_rotinas, setor_options):
+    """Controla o acesso à área de administração."""
     if st.session_state.get('logged_in', False):
         admin_view(df_rotinas, setor_options)
     else:
@@ -206,13 +253,13 @@ def main():
     st.set_page_config(page_title="SGC Hospitalar - Rotinas", layout="wide")
     st.title("🏥 Sistema de Gerenciamento de Conhecimento Hospitalar (SGC)")
 
-    # ... (Lógica Global de Atualização inalterada) ...
     col_refresh, col_title_info = st.columns([1, 4])
     with col_refresh:
-        if st.button("🔄 Atualizar Dados Agora"):
+        if st.button("🔄 Atualizar Dados Agora", help="Força a busca e o recarregamento dos dados mais recentes da fonte (Google Drive/Planilha)."):
             load_all_rotinas_from_drive.clear()
             st.rerun()
-    col_title_info.info("A página é atualizada automaticamente.")
+
+    col_title_info.info("A página é atualizada automaticamente ao ser aberta e quando o botão 'Atualizar Dados Agora' é pressionado.")
     st.markdown("---")
 
     # --- Carregamento de Dados ---
@@ -220,7 +267,6 @@ def main():
         df_rotinas = load_all_rotinas_from_drive()
 
     if df_rotinas.empty:
-        # Se falhar o carregamento, exibe o erro da função load_all_rotinas_from_drive e para
         return
         
     setor_options = sorted(df_rotinas['SETOR'].unique().tolist())
@@ -230,7 +276,6 @@ def main():
     PAGES_OPTIONS = ["🔍 Visualização de Rotinas", "🛠️ Gerenciamento de Dados"]
     selection = st.sidebar.radio("Ir para:", PAGES_OPTIONS)
     
-    # Chama a função correta
     if selection == "🛠️ Gerenciamento de Dados":
         admin_controller(df_rotinas, setor_options)
     else:
