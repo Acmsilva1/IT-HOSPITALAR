@@ -1,14 +1,13 @@
 import streamlit as st
 import pandas as pd
-# Importa as duas funções do data_loader
-from data_loader import load_all_rotinas_from_drive, append_new_rotina 
+from data_loader import load_all_rotinas_from_drive, append_new_rotina, update_rotina
 
 # --- FUNÇÕES DE PÁGINA ---
 
 def main_view(df_rotinas, setor_options):
-    """Lógica da Página de Visualização de Rotinas (Código Original)"""
+    """Lógica da Página de Visualização de Rotinas (Read)"""
     st.header("🔍 Visualização de Rotinas do SGC Hospitalar")
-    
+    # ... (restante do código da main_view - sem alteração) ...
     st.sidebar.header("🧭 Navegação por Setor")
     
     menu_options = ["— Selecione um Setor —"] + setor_options
@@ -75,77 +74,178 @@ def main_view(df_rotinas, setor_options):
     st.sidebar.caption("Lembrete LGPD: SGC lida apenas com metadados de processos, sem Dados Pessoais.")
 
 
-def admin_view(setor_options):
-    """NOVA Lógica da Página de Gerenciamento de Dados (Formulário)"""
-    st.header("🛠️ Gerenciamento de Rotinas (Criação de Processos)")
-    
-    st.warning("🚨 Esta página será protegida por senha na próxima etapa de governança.")
-    st.info("Preencha o formulário abaixo para adicionar uma nova rotina diretamente no Google Sheets. O novo processo aparecerá na visualização após salvar.")
-    
+def create_rotina_tab(setor_options):
+    """Lógica da Sub-Aba para Criação de Novas Rotinas (Create)"""
     st.subheader("Adicionar Nova Rotina")
+    st.info("Preencha o formulário para adicionar uma nova rotina diretamente no Google Sheets.")
     
-    # Criação do Formulário
     with st.form(key='rotina_form'):
         
-        # CAMPO 1: Setor (Determina a ABA de destino no Sheets)
+        # Campo 1: Setor (Determina a ABA de destino no Sheets)
         selected_setor = st.selectbox(
             "1. Setor de Destino (Aba na Planilha):", 
             options=["— Selecione um Setor —"] + setor_options, 
-            key='setor_input'
+            key='create_setor_input'
         )
         
         st.markdown("---")
         
-        # CAMPO 2 e 3: Título e ID (Colunas 'TITULO_PROCEDIMENTO' e 'ID_DA_ROTINA')
+        # Campo 2 e 3: Título e ID
         col1, col2 = st.columns(2)
         with col1:
-            titulo = st.text_input("2. Título do Procedimento (TITULO_PROCEDIMENTO):", key='titulo_input')
+            titulo = st.text_input("2. Título do Procedimento (TITULO_PROCEDIMENTO):", key='create_titulo_input')
         with col2:
-            id_rotina = st.text_input("3. ID da Rotina (ID_DA_ROTINA, Ex: CC-001):", key='id_input')
+            id_rotina = st.text_input("3. ID da Rotina (ID_DA_ROTINA, Ex: CC-001):", key='create_id_input')
             
-        # CAMPO 4: Fluxo Principal (Coluna 'FLUXO_PRINCIPAL')
-        fluxo_principal = st.text_input("4. Fluxo Principal (FLUXO_PRINCIPAL, Ex: TASY > [Menu] > [Submenu]):", key='fluxo_input')
+        # Campo 4: Fluxo Principal
+        fluxo_principal = st.text_input("4. Fluxo Principal (FLUXO_PRINCIPAL, Ex: TASY > [Menu] > [Submenu]):", key='create_fluxo_input')
         
-        # CAMPO 5: Ações/Passos (Coluna 'ACOES' - Usa '\n' para ser convertido em '#')
+        # Campo 5: Ações/Passos
         acoes = st.text_area(
             "5. Ações/Passo a Passo (ACOES) - Separe cada passo com uma quebra de linha!:", 
-            key='acoes_input',
+            key='create_acoes_input',
             height=200
         )
         
-        # CAMPO 6: Observações (Coluna 'OBSERVACOES')
-        observacoes = st.text_area("6. Observações (OBSERVACOES - Avisos, Dicas, etc.):", key='obs_input')
+        # Campo 6: Observações
+        observacoes = st.text_area("6. Observações (OBSERVACOES - Avisos, Dicas, etc.):", key='create_obs_input')
         
-        # Botão de Envio
         submit_button = st.form_submit_button(label='💾 Salvar Nova Rotina no Sheets')
 
-    # Lógica de Envio
     if submit_button:
-        # Checagem mínima
         if not titulo or not acoes or selected_setor == "— Selecione um Setor —":
             st.error("🚨 Preencha o Título, as Ações/Passos e selecione um Setor de destino.")
             return
 
-        # Prepara os dados. CHAVES DEVEM BATER COM OS CABEÇALHOS DA PLANILHA!
         data_to_save = {
             "ID_DA_ROTINA": id_rotina,
             "TITULO_PROCEDIMENTO": titulo,
             "FLUXO_PRINCIPAL": fluxo_principal,
-            "ACOES": acoes.replace('\n', '#'), # Converte quebras de linha para o separador '#'
+            "ACOES": acoes.replace('\n', '#'), 
             "OBSERVACOES": observacoes
         }
         
-        # Chama a função de escrita, usando o setor selecionado como nome da aba
         with st.spinner(f"Salvando rotina no Sheets na aba {selected_setor}..."):
             if append_new_rotina(data_to_save, selected_setor):
-                # Limpa o cache para garantir que a visualização de rotinas veja a nova linha imediatamente
                 load_all_rotinas_from_drive.clear()
-                st.success(f"Rotina '{titulo}' salva com sucesso! Pressione 'Atualizar Dados Agora' ou F5 na visualização para ver a mudança.")
-                # Opcional: st.rerun() aqui forçaria a visualização imediata, mas é melhor forçar o usuário a usar o botão, por enquanto.
+                st.success(f"Rotina '{titulo}' salva com sucesso! Pressione 'Atualizar Dados Agora' na Visualização para ver a mudança.")
             else:
                 st.warning("Falha ao salvar. Verifique logs ou credenciais.")
 
-# --- FUNÇÃO PRINCIPAL ---
+
+def edit_rotina_tab(df_rotinas):
+    """NOVA Lógica da Sub-Aba para Edição de Rotinas Existentes (Update)"""
+    st.subheader("Alterar/Editar Rotina Existente")
+    st.info("Selecione uma rotina para carregar e editar seus dados. A alteração será salva no Google Sheets.")
+    
+    # 1. SELEÇÃO DA ROTINA
+    # Crie uma lista de rotinas para o selectbox, combinando o título e o setor para facilitar
+    rotina_tuples = [(f"{row['TITULO_PROCEDIMENTO']} ({row['SETOR']})", row['TITULO_PROCEDIMENTO']) 
+                     for index, row in df_rotinas.iterrows()]
+    
+    display_options = ["— Selecione uma Rotina —"] + [t[0] for t in rotina_tuples]
+    
+    selected_display_option = st.selectbox(
+        "Selecione a Rotina para Editar:",
+        options=display_options,
+        key='edit_selectbox'
+    )
+    
+    if selected_display_option == "— Selecione uma Rotina —":
+        return
+
+    # 2. CARREGAMENTO DOS DADOS ATUAIS
+    # Extrai o TITULO_PROCEDIMENTO da opção selecionada
+    selected_title = selected_display_option.split(' (')[0]
+    
+    # Filtra o DataFrame para obter os valores atuais
+    current_data = df_rotinas[df_rotinas['TITULO_PROCEDIMENTO'] == selected_title].iloc[0]
+    sheet_name = current_data['SETOR']
+    
+    # Pre-processa o campo ACOES para o text area (troca '#' de volta para '\n')
+    initial_acoes = current_data['ACOES'].replace('#', '\n') if isinstance(current_data['ACOES'], str) else ""
+
+    st.markdown("---")
+    st.caption(f"Editando Rotina: **{current_data['TITULO_PROCEDIMENTO']}** na aba **{sheet_name}**")
+    
+    # 3. FORMULÁRIO DE EDIÇÃO (Pré-preenchido)
+    with st.form(key='edit_rotina_form'):
+        
+        # Campo 1: Título (usado como chave de busca, MUITA ATENÇÃO ao editar)
+        titulo = st.text_input("1. Título do Procedimento (TITULO_PROCEDIMENTO):", 
+                               value=current_data['TITULO_PROCEDIMENTO'], 
+                               key='edit_titulo_input',
+                               help="ATENÇÃO: Este é o campo que identifica a linha no Sheets. Edite apenas se for INTENÇÃO mudar o título.")
+        
+        # Campo 2 e 3: ID e Fluxo
+        col1, col2 = st.columns(2)
+        with col1:
+            id_rotina = st.text_input("2. ID da Rotina (ID_DA_ROTINA):", 
+                                      value=current_data['ID_DA_ROTINA'], 
+                                      key='edit_id_input')
+        with col2:
+            fluxo_principal = st.text_input("3. Fluxo Principal (FLUXO_PRINCIPAL):", 
+                                            value=current_data['FLUXO_PRINCIPAL'], 
+                                            key='edit_fluxo_input')
+
+        # Campo 4: Ações/Passos
+        acoes = st.text_area(
+            "4. Ações/Passo a Passo (ACOES) - Separe cada passo com uma quebra de linha!:", 
+            value=initial_acoes,
+            key='edit_acoes_input',
+            height=250
+        )
+        
+        # Campo 5: Observações
+        observacoes = st.text_area("5. Observações (OBSERVACOES):", 
+                                   value=current_data['OBSERVACOES'], 
+                                   key='edit_obs_input')
+        
+        submit_button = st.form_submit_button(label='✍️ Salvar Alterações no Sheets')
+
+    # 4. LÓGICA DE SALVAMENTO (UPDATE)
+    if submit_button:
+        # Checagem mínima de integridade dos dados
+        if not titulo or not acoes:
+            st.error("🚨 O Título e as Ações/Passos não podem ficar vazios.")
+            return
+            
+        # Dicionário de dados para a função de update
+        data_to_update = {
+            "ID_DA_ROTINA": id_rotina,
+            "TITULO_PROCEDIMENTO": titulo, 
+            "FLUXO_PRINCIPAL": fluxo_principal,
+            "ACOES": acoes.replace('\n', '#'),
+            "OBSERVACOES": observacoes
+        }
+        
+        # Chama a função de update, usando o título ORIGINAL como chave de busca
+        with st.spinner(f"Atualizando rotina no Sheets na aba {sheet_name}..."):
+            if update_rotina(sheet_name, current_data['TITULO_PROCEDIMENTO'], data_to_update):
+                load_all_rotinas_from_drive.clear() # Limpa o cache para forçar a busca de dados novos
+                st.success(f"Rotina '{titulo}' atualizada com sucesso na aba '{sheet_name}'!")
+            else:
+                st.warning("Falha ao atualizar. Verifique logs ou credenciais.")
+
+
+def admin_view(df_rotinas, setor_options):
+    """Função Principal do Módulo de Gerenciamento (Tabs)"""
+    st.header("🛠️ Gerenciamento de Rotinas (Criação e Edição)")
+    st.warning("🚨 Esta página será protegida por senha na próxima etapa de governança.")
+    st.info("Utilize as abas abaixo para gerenciar os processos hospitalares.")
+    
+    # NOVAS ABAS
+    tab1, tab2 = st.tabs(["➕ Criar Nova Rotina", "✏️ Editar Rotina Existente"])
+    
+    with tab1:
+        create_rotina_tab(setor_options)
+        
+    with tab2:
+        # Passa o DataFrame completo para a função de edição
+        edit_rotina_tab(df_rotinas) 
+
+
+# --- FUNÇÃO PRINCIPAL (Estrutura da Aplicação) ---
 
 def main():
     st.set_page_config(
@@ -176,17 +276,16 @@ def main():
         
     setor_options = sorted(df_rotinas['SETOR'].unique().tolist())
     
-    # --- SELEÇÃO DE PÁGINA na Sidebar (para o Admin) ---
+    # --- SELEÇÃO DE PÁGINA na Sidebar ---
     st.sidebar.header("Módulos")
     
     PAGES = {
         "🔍 Visualização de Rotinas": lambda: main_view(df_rotinas, setor_options),
-        "🛠️ Gerenciamento de Dados": lambda: admin_view(setor_options) # Novo módulo
+        "🛠️ Gerenciamento de Dados": lambda: admin_view(df_rotinas, setor_options) # Passa df_rotinas
     }
     
     selection = st.sidebar.radio("Ir para:", list(PAGES.keys()))
     
-    # Executa a função da página selecionada
     PAGES[selection]()
 
 if __name__ == '__main__':
