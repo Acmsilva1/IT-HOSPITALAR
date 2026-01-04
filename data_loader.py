@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import gspread
 
-# --- Configurações de Governança (Sem Alteração) ---
+# --- Configurações de Governança ---
 
 # Lista de todas as abas (Worksheets) a serem lidas para unificação
 SHEET_NAMES = [
@@ -14,8 +14,8 @@ SHEET_NAMES = [
     'RECEPCAO_CENTRAL',
     'PORTARIA',
     'MEDICOS',
-    'ENFERMAGEM',   # <<-- NOVA ABA
-    'MANUTENCAO'    # <<-- NOVA ABA
+    'ENFERMAGEM',
+    'MANUTENCAO'
 ]
 
 # ID da planilha lido dos secrets para segurança
@@ -24,9 +24,9 @@ try:
 except KeyError:
     SPREADSHEET_ID = None
 
-# --- Função Principal de Carga de Dados ---
+# --- Função Principal de Carga de Dados (Read) ---
 
-@st.cache_data # ALTERADO: Removido o (ttl=600). Agora o cache só é limpo com .clear() ou F5.
+@st.cache_data # ALTERADO: Removido o (ttl=600). O cache agora só é limpo com .clear() ou F5.
 def load_all_rotinas_from_drive():
     """
     Carrega dados de todas as abas da Planilha Google de forma segura 
@@ -34,9 +34,8 @@ def load_all_rotinas_from_drive():
     """
     all_data = []
     
-    # ... (Resto do código sem alteração) ...
     try:
-        # 1. Autenticação Segura (função corrigida)
+        # 1. Autenticação Segura
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
         
         # 2. Abre a planilha pelo ID
@@ -63,9 +62,46 @@ def load_all_rotinas_from_drive():
         st.error(f"ERRO DE CONFIGURAÇÃO (KeyError): Verifique se a chave '{e}' está correta nos Secrets.")
         return pd.DataFrame()
     except gspread.exceptions.APIError as e:
-        # Lembrete de governança: Certifique-se que este e-mail tem acesso de Leitor.
         st.error(f"ERRO DE PERMISSÃO (403 Forbidden): Certifique-se de que a Service Account foi adicionada como Leitor na Planilha Google.")
         return pd.DataFrame()
     except Exception as e:
         st.error(f"Erro Inesperado ao carregar dados: {e}")
         return pd.DataFrame()
+
+
+# --- NOVA FUNÇÃO: Escrita no Google Sheets (Append) ---
+
+def append_new_rotina(data: dict, sheet_name: str):
+    """
+    Conecta ao Google Sheets e anexa uma nova linha de dados (Rotina).
+    
+    data: Dicionário onde as chaves devem bater com os nomes das colunas.
+    sheet_name: A aba específica onde a rotina será adicionada.
+    """
+    try:
+        # 1. Autenticação Segura
+        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
+        
+        # 2. Abre a planilha pelo ID
+        if not SPREADSHEET_ID:
+            raise KeyError("ID da planilha não encontrado nos secrets.")
+            
+        sh = gc.open_by_key(SPREADSHEET_ID)
+        
+        # 3. Abre a aba desejada
+        worksheet = sh.worksheet(sheet_name)
+        
+        # 4. Obtém os cabeçalhos (para garantir a ordem correta)
+        headers = worksheet.row_values(1)
+        
+        # 5. Cria a lista de valores na ordem dos cabeçalhos
+        values = [data.get(header.strip(), '') for header in headers]
+        
+        # 6. Anexa a nova linha
+        worksheet.append_row(values, value_input_option='USER_ENTERED')
+        
+        return True
+
+    except Exception as e:
+        st.error(f"Erro ao escrever na aba {sheet_name}. Detalhes: {e}")
+        return False
