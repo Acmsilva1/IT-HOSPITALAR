@@ -1,11 +1,11 @@
+# data_loader.py
 import streamlit as st
 import pandas as pd
 import gspread
-import gspread.utils # <-- FIX: Importado globalmente para evitar o erro de escopo
+import gspread.utils # <-- CORREÇÃO: Importado globalmente para evitar o erro de escopo
 
 # --- Configurações de Governança ---
 
-# Lista de todas as abas (Worksheets) a serem lidas para unificação
 SHEET_NAMES = [
     'REGULACAO',
     'INTERNACAO',
@@ -19,11 +19,7 @@ SHEET_NAMES = [
     'MANUTENCAO'
 ]
 
-# ID da planilha lido dos secrets para segurança
 try:
-    # Atenção: Esta chave pode ser diferente dependendo da sua configuração de secrets.
-    # Se estiver usando o contexto de precificação de bolos, a chave pode ser 'spreadsheet_ids'
-    # Manter a chave 'rotinas_hospitalares' conforme contexto original.
     SPREADSHEET_ID = st.secrets["spreadsheet_ids"]["rotinas_hospitalares"] 
 except KeyError:
     SPREADSHEET_ID = None
@@ -32,33 +28,24 @@ except KeyError:
 
 @st.cache_data 
 def load_all_rotinas_from_drive():
-    """
-    Carrega dados de todas as abas da Planilha Google de forma segura 
-    e os consolida em um único DataFrame.
-    """
+    """Carrega dados de todas as abas da Planilha Google."""
     all_data = []
     
     try:
-        # 1. Autenticação Segura
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
         
-        # 2. Abre a planilha pelo ID
         if not SPREADSHEET_ID:
             raise KeyError("ID da planilha não encontrado nos secrets.")
             
         sh = gc.open_by_key(SPREADSHEET_ID)
         
-        # 3. Itera sobre todas as abas e unifica os dados
         for name in SHEET_NAMES:
             worksheet = sh.worksheet(name)
             data = worksheet.get_all_records()
             df = pd.DataFrame(data)
-            
-            # Adiciona a coluna 'SETOR' para fácil filtragem
             df['SETOR'] = name
             all_data.append(df)
 
-        # 4. Concatena tudo em um DataFrame único
         df_final = pd.concat(all_data, ignore_index=True)
         return df_final
 
@@ -66,7 +53,7 @@ def load_all_rotinas_from_drive():
         st.error(f"ERRO DE CONFIGURAÇÃO (KeyError): Verifique se a chave '{e}' está correta nos Secrets.")
         return pd.DataFrame()
     except gspread.exceptions.APIError as e:
-        st.error(f"ERRO DE PERMISSÃO (403 Forbidden): Certifique-se de que a Service Account foi adicionada como Leitor na Planilha Google.")
+        st.error(f"ERRO DE PERMISSÃO (403 Forbidden): Certifique-se de que a Service Account foi adicionada como Editor na Planilha Google.")
         return pd.DataFrame()
     except Exception as e:
         st.error(f"Erro Inesperado ao carregar dados: {e}")
@@ -76,9 +63,7 @@ def load_all_rotinas_from_drive():
 # --- Função: Escrita no Google Sheets (Create) ---
 
 def append_new_rotina(data: dict, sheet_name: str):
-    """
-    Conecta ao Google Sheets e anexa uma nova linha de dados (Rotina).
-    """
+    """Conecta ao Google Sheets e anexa uma nova linha de dados (Rotina)."""
     try:
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
         sh = gc.open_by_key(SPREADSHEET_ID)
@@ -98,9 +83,7 @@ def append_new_rotina(data: dict, sheet_name: str):
 # --- Função: Atualizar Rotina Existente (Update) ---
 
 def update_rotina(sheet_name: str, old_title: str, new_data: dict):
-    """
-    Busca uma rotina pelo TITULO_PROCEDIMENTO na aba específica e atualiza sua linha.
-    """
+    """Busca uma rotina pelo TITULO_PROCEDIMENTO na aba específica e atualiza sua linha."""
     try:
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
         sh = gc.open_by_key(SPREADSHEET_ID)
@@ -130,8 +113,7 @@ def update_rotina(sheet_name: str, old_title: str, new_data: dict):
             new_val = new_data.get(header.strip(), all_values[row_index_to_update - 1][headers.index(header)])
             new_values_list.append(str(new_val))
 
-        # 4. Atualizar a linha inteira no Sheets
-        # AGORA USA O gspread.utils IMPORTADO GLOBALMENTE (no topo)
+        # Atualizar a linha inteira no Sheets (usa gspread.utils importado globalmente)
         range_to_update = f'A{row_index_to_update}:{gspread.utils.rowcol_to_a1(row_index_to_update, len(headers))}'
         
         worksheet.update(range_to_update, [new_values_list], value_input_option='USER_ENTERED')
@@ -146,9 +128,7 @@ def update_rotina(sheet_name: str, old_title: str, new_data: dict):
 # --- Função: Excluir Rotina (Delete) ---
 
 def delete_rotina(sheet_name: str, title_to_delete: str):
-    """
-    Busca uma rotina pelo TITULO_PROCEDIMENTO na aba específica e a deleta.
-    """
+    """Busca uma rotina pelo TITULO_PROCEDIMENTO na aba específica e a deleta."""
     try:
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"]) 
         sh = gc.open_by_key(SPREADSHEET_ID)
@@ -173,7 +153,6 @@ def delete_rotina(sheet_name: str, title_to_delete: str):
             st.warning(f"Rotina com título '{title_to_delete}' não encontrada para exclusão na aba '{sheet_name}'.")
             return False
             
-        # Excluir a linha inteira no Sheets
         worksheet.delete_rows(row_index_to_delete)
         
         return True
