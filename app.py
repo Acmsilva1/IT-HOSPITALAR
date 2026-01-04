@@ -7,7 +7,7 @@ from data_loader import load_all_rotinas_from_drive, append_new_rotina, update_r
 # --- FUNÇÕES DE PÁGINA ---
 
 def main_view(df_rotinas, setor_options):
-    """Lógica da Página de Visualização de Rotinas (Read) - Incluindo Anexo Corrigido"""
+    """Lógica da Página de Visualização de Rotinas (Read) - Final e Corrigido"""
     st.header("🔍 Visualização de Rotinas do SGC Hospitalar")
     
     st.sidebar.header("🧭 Navegação por Setor")
@@ -49,25 +49,39 @@ def main_view(df_rotinas, setor_options):
                 with col2:
                     st.warning(f"⚠️ Observações: {row['OBSERVACOES']}" if row['OBSERVACOES'] else "Sem observações críticas.")
 
-                # --- BLOCO CORRIGIDO: Exibição do Anexo Visual ---
-                image_url = row.get('URL_IMAGEM')
+                # --- BLOCO CORRIGIDO FINAL: Exibição de MÚLTIPLOS Anexos ---
+                image_url_string = row.get('URL_IMAGEM')
                 
-                if image_url and str(image_url).strip():
-                    url = str(image_url).strip()
+                if image_url_string and str(image_url_string).strip():
+                    # Usa a vírgula (,) como separador para múltiplas URLs
+                    url_list = [url.strip() for url in image_url_string.split(',') if url.strip()]
                     
-                    with st.expander("🖼️ Clique para visualizar o Anexo/Fluxograma"):
-                        
-                        if url.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                            st.image(url, caption=f"Anexo para: {row['TITULO_PROCEDIMENTO']}", width=400)
-                        
-                        elif url.lower().endswith(('.pdf', '.doc', '.docx')):
-                            st.info("Este anexo é um documento (PDF/Word). Clique no link abaixo para abrir em uma nova aba:")
-                            st.markdown(f"**[🔗 Abrir Documento Anexado]({url})**")
-                        
-                        else:
-                            st.markdown(f"**[🔗 Abrir Anexo Externo]({url})**")
-                            st.caption("O formato do anexo não é uma imagem comum, abrindo como link externo.")
-                # --- FIM BLOCO ANEXO ---
+                    if url_list:
+                        with st.expander(f"🖼️ Clique para visualizar {len(url_list)} Anexo(s)/Fluxograma(s)"):
+                            
+                            for i, url in enumerate(url_list):
+                                st.markdown(f"#### Anexo {i + 1}")
+                                
+                                # NOVO: Limpa parâmetros de query (?raw=true) antes de verificar a extensão
+                                clean_url = url.split('?')[0] 
+                                clean_url_lower = clean_url.lower()
+
+                                # 1. Verifica se é uma URL de imagem comum
+                                if clean_url_lower.endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                                    st.image(url, caption=f"Anexo {i + 1} para: {row['TITULO_PROCEDIMENTO']}", width=400)
+                                
+                                # 2. Se for PDF, DOC, etc., exibe apenas o link
+                                elif clean_url_lower.endswith(('.pdf', '.doc', '.docx')):
+                                    st.info("Este anexo é um documento (PDF/Word). Clique no link abaixo para abrir em uma nova aba:")
+                                    st.markdown(f"**[🔗 Abrir Documento Anexado]({url})**")
+                                
+                                # 3. Qualquer outro tipo de link (Ação original que estava sendo ativada indevidamente)
+                                else:
+                                    st.markdown(f"**[🔗 Abrir Anexo Externo]({url})**")
+                                    st.caption("O formato do anexo não é uma imagem comum, abrindo como link externo.")
+                                
+                                st.markdown("---") 
+                # --- FIM BLOCO ANEXOS ---
 
                 st.markdown("#### 🚀 Passo a Passo Objetivo:")
                 for i, passo in enumerate(acoes_list):
@@ -84,7 +98,7 @@ def main_view(df_rotinas, setor_options):
 def create_rotina_tab(setor_options):
     """Lógica da Sub-Aba para Criação de Novas Rotinas (Create)"""
     st.subheader("Adicionar Nova Rotina")
-    st.info("Preencha o formulário para adicionar uma nova rotina diretamente no Google Sheets.")
+    st.info("Preencha o formulário para adicionar uma nova rotina diretamente no Google Sheets. Use a **vírgula (,)** para separar múltiplas URLs de anexo.")
     
     with st.form(key='rotina_form'):
         
@@ -102,7 +116,7 @@ def create_rotina_tab(setor_options):
         st.markdown("---")
         st.markdown("#### 🖼️ Anexo Visual (Imagem)")
 
-        anexo_url = st.text_input("7. URL da Imagem/Fluxograma (Link Direto):", key='create_anexo_url', help="Cole o link direto da imagem aqui (salva no Drive/GitHub, etc.).")
+        anexo_url = st.text_input("7. URL da Imagem/Fluxograma (Links Diretos Separados por Vírgula):", key='create_anexo_url', help="Cole os links diretos das imagens aqui (GitHub, ImgBB, etc.).")
 
         uploaded_file = st.file_uploader("Upload de Imagem para PRÉ-VISUALIZAÇÃO:", type=['png', 'jpg', 'jpeg'], key='temp_file_uploader')
         
@@ -166,7 +180,7 @@ def edit_rotina_tab(df_rotinas):
         with col2: fluxo_principal = st.text_input("3. Fluxo Principal:", value=current_data['FLUXO_PRINCIPAL'], key='edit_fluxo_input')
         acoes = st.text_area("4. Ações/Passo a Passo:", value=initial_acoes, key='edit_acoes_input', height=250)
         observacoes = st.text_area("5. Observações:", value=current_data['OBSERVACOES'], key='edit_obs_input')
-        anexo_url = st.text_input("URL do Anexo (Link direto):", value=initial_anexo_url, key='edit_anexo_url')
+        anexo_url = st.text_input("URL do Anexo (Links Diretos Separados por Vírgula):", value=initial_anexo_url, key='edit_anexo_url')
         
         uploaded_file = st.file_uploader("Upload de Imagem para PRÉ-VISUALIZAÇÃO:", type=['png', 'jpg', 'jpeg'], key='temp_file_uploader_edit')
         if uploaded_file is not None:
