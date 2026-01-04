@@ -1,15 +1,14 @@
 import streamlit as st
 import pandas as pd
-# Importa as três funções (C, R, U, D)
+# Importa as três funções de manipulação e o load
 from data_loader import load_all_rotinas_from_drive, append_new_rotina, update_rotina, delete_rotina 
 
 # --- FUNÇÕES DE PÁGINA ---
 
-# ... (Mantenha a função main_view e create_rotina_tab sem alterações) ...
 def main_view(df_rotinas, setor_options):
     """Lógica da Página de Visualização de Rotinas (Read)"""
     st.header("🔍 Visualização de Rotinas do SGC Hospitalar")
-    
+    # ... (restante do código da main_view inalterado) ...
     st.sidebar.header("🧭 Navegação por Setor")
     
     menu_options = ["— Selecione um Setor —"] + setor_options
@@ -198,8 +197,6 @@ def edit_rotina_tab(df_rotinas):
             submit_update = st.form_submit_button(label='✍️ Salvar Alterações (UPDATE)')
             
         with col_delete:
-            # Novo botão de DELETE
-            # Usamos uma chave diferente para não conflitar com o submit principal (UPDATE)
             submit_delete = st.form_submit_button(label='🗑️ Excluir Rotina Permanentemente', type="primary")
 
 
@@ -222,20 +219,21 @@ def edit_rotina_tab(df_rotinas):
             if update_rotina(sheet_name, current_data['TITULO_PROCEDIMENTO'], data_to_update):
                 load_all_rotinas_from_drive.clear() 
                 st.success(f"Rotina '{titulo}' atualizada com sucesso na aba '{sheet_name}'!")
-                # Força o recarregamento do painel para limpar a seleção
                 st.rerun() 
             else:
                 st.warning("Falha ao atualizar. Verifique logs ou credenciais.")
 
     # 5. LÓGICA DE EXCLUSÃO (DELETE)
     if submit_delete:
-        if st.warning("CONFIRMAÇÃO: Você tem certeza que deseja EXCLUIR permanentemente esta rotina?"):
-             # O título ORIGINAL é usado para encontrar e deletar a linha!
+        # Pede confirmação antes de deletar
+        st.warning("CONFIRMAÇÃO: Você tem certeza que deseja EXCLUIR permanentemente esta rotina? Se sim, clique no botão 'Excluir Rotina Permanentemente' novamente.")
+        
+        # Cria um botão de confirmação separado para a exclusão
+        if st.button(f"CONFIRMAR EXCLUSÃO: {selected_title}", type="secondary"):
             with st.spinner(f"Excluindo rotina '{selected_title}' na aba {sheet_name}..."):
                 if delete_rotina(sheet_name, selected_title):
                     load_all_rotinas_from_drive.clear()
                     st.success(f"Rotina '{selected_title}' DELETADA com sucesso! Recarregando a página...")
-                    # Força o recarregamento do painel para sair do modo de edição
                     st.rerun()
                 else:
                     st.error("Falha ao deletar. Rotina não excluída.")
