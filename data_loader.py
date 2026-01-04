@@ -19,11 +19,10 @@ SHEET_NAMES = [
     'MANUTENCAO'
 ]
 
-# Tenta carregar o ID da planilha do secrets
 try:
     SPREADSHEET_ID = st.secrets["spreadsheet_ids"]["rotinas_hospitalares"] 
 except KeyError:
-    SPREADSHEET_ID = None # Deve ser tratado na função de carga
+    SPREADSHEET_ID = None
 
 # --- Função Principal de Carga de Dados (Read) ---
 
@@ -34,22 +33,19 @@ def load_all_rotinas_from_drive():
     
     try:
         if not SPREADSHEET_ID:
-            # Lança KeyError para ser capturado abaixo
             raise KeyError("ID da planilha 'rotinas_hospitalares' não encontrado nos secrets.")
             
-        # Conexão Gspread
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
         sh = gc.open_by_key(SPREADSHEET_ID)
         
         for name in SHEET_NAMES:
             worksheet = sh.worksheet(name)
-            # Lê todos os registros
             data = worksheet.get_all_records()
             df = pd.DataFrame(data)
             
             df['SETOR'] = name
             
-            # Garante que a coluna de imagem existe no DataFrame lido para evitar falha no concat
+            # Garante que a coluna de imagem existe no DataFrame lido
             if 'URL_IMAGEM' not in df.columns:
                 df['URL_IMAGEM'] = '' 
             
@@ -66,7 +62,6 @@ def load_all_rotinas_from_drive():
         return pd.DataFrame()
     except Exception as e:
         st.error(f"Erro Inesperado na carga de dados: {e}")
-        # Uma tela preta pode vir daqui se o erro não for tratado corretamente.
         return pd.DataFrame()
 
 # --- Função: Escrita no Google Sheets (Create) ---
@@ -101,7 +96,6 @@ def update_rotina(sheet_name: str, old_title: str, new_data: dict):
         all_values = worksheet.get_all_values()
         headers = all_values[0]
         
-        # ... (código de localização de linha inalterado) ...
         try:
             title_col_index = headers.index("TITULO_PROCEDIMENTO")
         except ValueError:
@@ -120,11 +114,9 @@ def update_rotina(sheet_name: str, old_title: str, new_data: dict):
             
         new_values_list = []
         for header in headers:
-            # Busca o novo valor no dicionário new_data ou usa o valor antigo
             new_val = new_data.get(header.strip(), all_values[row_index_to_update - 1][headers.index(header)])
             new_values_list.append(str(new_val))
 
-        # Atualizar a linha inteira no Sheets
         range_to_update = f'A{row_index_to_update}:{gspread.utils.rowcol_to_a1(row_index_to_update, len(headers))}'
         
         worksheet.update(range_to_update, [new_values_list], value_input_option='USER_ENTERED')
@@ -139,7 +131,7 @@ def update_rotina(sheet_name: str, old_title: str, new_data: dict):
 # --- Função: Excluir Rotina (Delete) ---
 
 def delete_rotina(sheet_name: str, title_to_delete: str):
-    # ... (código inalterado) ...
+    """Busca uma rotina pelo TITULO_PROCEDIMENTO na aba específica e a deleta."""
     try:
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"]) 
         sh = gc.open_by_key(SPREADSHEET_ID)
