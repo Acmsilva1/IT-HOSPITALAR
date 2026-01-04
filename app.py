@@ -1,19 +1,38 @@
 import streamlit as st
 import pandas as pd
 from data_loader import load_all_rotinas_from_drive 
+# Importamos 'time' apenas se necessário, mas 'pd.Timestamp.now()' é suficiente e já está sendo usado.
 
 st.set_page_config(
     page_title="SGC Hospitalar - Rotinas", 
     layout="wide"
 )
 
-# --- Carregamento de Dados ---
-# Tenta carregar os dados. A função trata erros de conexão e credenciais.
-df_rotinas = load_all_rotinas_from_drive()
-
 # --- Configuração de Layout e Título ---
 st.title("🏥 Sistema de Gerenciamento de Conhecimento Hospitalar (SGC)")
 
+# --- NOVO: Botão de Atualização Manual ---
+col_refresh, col_title_info = st.columns([1, 4])
+
+with col_refresh:
+    # BOTÃO DE ATUALIZAR
+    # Ele limpa o cache da função de carregamento e força a re-execução do script.
+    if st.button("🔄 Atualizar Dados Agora", help="Força a busca e o recarregamento dos dados mais recentes da fonte (Google Drive/Planilha)."):
+        # Chamada essencial: limpar o cache da função que carrega os dados
+        load_all_rotinas_from_drive.clear() 
+        st.rerun()
+
+col_title_info.info("A página é atualizada automaticamente ao ser aberta (F5) e quando o botão 'Atualizar Dados Agora' é pressionado.")
+
+st.markdown("---")
+
+# --- Carregamento de Dados (Agora sob controle do Botão/F5) ---
+# Tenta carregar os dados. 
+with st.spinner('Buscando e carregando dados do SGC Hospitalar...'):
+    # A função será executada SEMPRE que o cache for limpo ou a página for aberta/atualizada.
+    df_rotinas = load_all_rotinas_from_drive()
+
+# --- Continuação da Lógica Principal ---
 if df_rotinas.empty:
     # Caso o data_loader falhe (erro de secrets, permissão, etc.)
     st.info("Aguardando dados da Planilha. Se o erro acima persistir, verifique as credenciais e as permissões.")
@@ -45,6 +64,8 @@ else:
             f"de cada uma das **{len(setor_options)}** áreas (como INTERNACAO, UTI, etc.)."
         )
         st.markdown("##### Foco em Ação, Não em Burocracia.")
+        
+        # O Timestamp agora reflete o momento exato do CARREGAMENTO DE DADOS (após o spinner)
         st.caption("Última atualização de dados: " + pd.Timestamp.now().strftime("%d/%m/%Y %H:%M:%S"))
 
     else:
