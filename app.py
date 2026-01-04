@@ -4,10 +4,10 @@ import pandas as pd
 # Importa todas as funções de data_loader
 from data_loader import load_all_rotinas_from_drive, append_new_rotina, update_rotina, delete_rotina 
 
-# --- FUNÇÕES DE PÁGINA (Definidas no escopo global para evitar NameError) ---
+# --- FUNÇÕES DE PÁGINA ---
 
 def main_view(df_rotinas, setor_options):
-    """Lógica da Página de Visualização de Rotinas (Read)"""
+    """Lógica da Página de Visualização de Rotinas (Read) - Incluindo Anexo Corrigido"""
     st.header("🔍 Visualização de Rotinas do SGC Hospitalar")
     
     st.sidebar.header("🧭 Navegação por Setor")
@@ -49,13 +49,26 @@ def main_view(df_rotinas, setor_options):
                 with col2:
                     st.warning(f"⚠️ Observações: {row['OBSERVACOES']}" if row['OBSERVACOES'] else "Sem observações críticas.")
 
-                # --- Exibição da Imagem (st.expander) ---
+                # --- BLOCO CORRIGIDO: Exibição do Anexo Visual ---
                 image_url = row.get('URL_IMAGEM')
-                if image_url and str(image_url).strip():
-                    with st.expander("🖼️ Clique para visualizar o Anexo/Fluxograma"):
-                        st.image(str(image_url), caption=f"Anexo para: {row['TITULO_PROCEDIMENTO']}", width=400)
-                # --- FIM Imagem ---
                 
+                if image_url and str(image_url).strip():
+                    url = str(image_url).strip()
+                    
+                    with st.expander("🖼️ Clique para visualizar o Anexo/Fluxograma"):
+                        
+                        if url.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                            st.image(url, caption=f"Anexo para: {row['TITULO_PROCEDIMENTO']}", width=400)
+                        
+                        elif url.lower().endswith(('.pdf', '.doc', '.docx')):
+                            st.info("Este anexo é um documento (PDF/Word). Clique no link abaixo para abrir em uma nova aba:")
+                            st.markdown(f"**[🔗 Abrir Documento Anexado]({url})**")
+                        
+                        else:
+                            st.markdown(f"**[🔗 Abrir Anexo Externo]({url})**")
+                            st.caption("O formato do anexo não é uma imagem comum, abrindo como link externo.")
+                # --- FIM BLOCO ANEXO ---
+
                 st.markdown("#### 🚀 Passo a Passo Objetivo:")
                 for i, passo in enumerate(acoes_list):
                      if passo and passo.strip():
@@ -161,7 +174,6 @@ def edit_rotina_tab(df_rotinas):
             
         st.markdown("---")
         
-        # Botão de Ação
         submit_update = st.form_submit_button(label='✍️ Salvar Alterações (UPDATE)')
         
         # LÓGICA DE SALVAMENTO (UPDATE) MOVIDA PARA DENTRO DO FORM
